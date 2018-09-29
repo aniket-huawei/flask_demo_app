@@ -12,7 +12,6 @@
 import os
 import requests
 import uuid
-import tempfile
 #import pdb
 from flask import Flask, render_template, request, url_for
 from scripts import url_tools

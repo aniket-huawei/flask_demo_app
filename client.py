@@ -13,7 +13,7 @@ import os
 import requests
 import uuid
 import tempfile
-import pdb
+#import pdb
 from flask import Flask, render_template, request, url_for
 from scripts import url_tools
 from os.path import basename, splitext
@@ -103,7 +103,7 @@ def index():
                 return render_template('index.html')
             http = urllib3.PoolManager()
 
-            pdb.set_trace()
+            #pdb.set_trace()
             res = http.request('POST', DETECTRON_URL, fields={'url':url_path})
             cls_boxes = res.data 
 

@@ -12,7 +12,7 @@
 import os
 import requests
 import uuid
-#import pdb
+import pdb
 from flask import Flask, render_template, request, url_for
 from scripts import url_tools
 from os.path import basename, splitext
@@ -26,7 +26,6 @@ APP_ROOT= os.path.dirname(os.path.abspath(__file__))
 app = Flask(__name__, root_path=APP_ROOT, static_url_path='/static')
 
 FLASK_DOWNLOAD_DIR = './static/'
-#FLASK_RPN_OUTPUT_DIR = './rpn_output/'
 FLASK_SG_OUTPUT_DIR = './sg_output/'
 IMAGE_EXT = 'jpg'
 
@@ -36,7 +35,6 @@ IMAGE_EXT = 'jpg'
 
 def cleanup_files():
     [os.remove(os.path.join(os.path.abspath(FLASK_DOWNLOAD_DIR),file)) for file in os.listdir(FLASK_DOWNLOAD_DIR) if file.endswith('.jpg')]
-#    [os.remove(os.path.join(os.path.abspath(FLASK_RPN_OUTPUT_DIR),file)) for file in os.listdir(FLASK_RPN_OUTPUT_DIR) if file.endswith('.pkl')]
 
 def adjust_bbox_scale(image_size, sub_bbox_list, obj_bbox_list):
     # Get image height, width
@@ -102,39 +100,36 @@ def index():
                 return render_template('index.html')
             http = urllib3.PoolManager()
 
-            #pdb.set_trace()
+            pdb.set_trace()
             res = http.request('POST', DETECTRON_URL, fields={'url':url_path})
             cls_boxes = res.data 
 
             # Get scene graph data from Scen graph serice for a given image url 
             if cls_boxes:
                 sg_res = http.request('POST', SCENEGRAPH_URL, fields={'url':url_path, 'data':cls_boxes})
-                sg_data = json.loads(sg_res.data)
-            else:
-                return make_response("Could not generate region proposal bounding boxes. Please enter another image url", 200)
-            
-            # Generate unique file name to store the image
-            unique_file_name = uuid.uuid4().hex
-            download_path = os.path.join(FLASK_DOWNLOAD_DIR, unique_file_name + "." + IMAGE_EXT)
-            print (download_path)
-            url_tools.download_image(url_path, download_path) 
-            _, d_file_name = os.path.split(download_path)
-            abs_path_image = os.path.abspath(download_path)
-            abs_path_rpn_output = os.path.join(os.path.abspath('.'), 'rpn_output')
-            abs_path_sg_output = os.path.join(os.path.abspath('.'), 'sg_output')
-
-            if cls_boxes:
-                if sg_data:
-                    #Draw bounding boxes
-                    coordinates_list = sg_data['sub_bbox_list'] + sg_data['obj_bbox_list']
-                    image_size_list = sg_data['image_info'][2]
-                    image_2_path = draw_boundingbox(download_path, image_size_list, coordinates_list)
-                else:
+                if (sg_res.status == 200):
+                    sg_data = json.loads(sg_res.data)
+                    if sg_data:
+                        #Draw bounding boxes
+                        coordinates_list = sg_data['sub_bbox_list'] + sg_data['obj_bbox_list']
+                        image_size_list = sg_data['image_info'][2]
+                        image_2_path = draw_boundingbox(download_path, image_size_list, coordinates_list)
+                        # Generate unique file name to store the image
+                        unique_file_name = uuid.uuid4().hex
+                        download_path = os.path.join(FLASK_DOWNLOAD_DIR, unique_file_name + "." + IMAGE_EXT)
+                        print (download_path)
+                        url_tools.download_image(url_path, download_path) 
+                        _, d_file_name = os.path.split(download_path)
+                        abs_path_image = os.path.abspath(download_path)
+                elif (sg_res.status == 204):
                     errors.append('No scene graph generated for this image. Please enter another url')
                     return render_template('index.html', errors=errors, results=results)
-
+                else:
+                    errors.append('Scene graph generation failed. Please enter another url')
+                    return render_template('index.html', errors=errors, results=results)
             else:
-                return render_template('error.html', msg='Could not find region proposals file.')
+                return render_template('index.html', msg='Could not generate region proposals info.')
+
 
             return render_template('plot_image.html', user_image1=download_path, user_image2=image_2_path) #, user_image3=None)
         except:
